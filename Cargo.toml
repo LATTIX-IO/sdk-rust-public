@@ -1,0 +1,27 @@
+[package]
+name = "sdk-rust"
+version = "0.1.0"
+edition = "2024"
+description = "Canonical Rust core for the Lattix metadata-only control-plane SDK"
+readme = "README.md"
+license-file = "LICENSE"
+repository = "https://github.com/LATTIX-IO/sdk-rust"
+homepage = "https://lattix.io/"
+documentation = "https://docs.rs/sdk-rust"
+keywords = ["lattix", "sdk", "zero-trust", "metadata", "control-plane"]
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[package.metadata.docs.rs]
+default-target = "x86_64-unknown-linux-gnu"
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", default-features = true, features = ["json"] }
+
+[dev-dependencies]
+mockito = "1"

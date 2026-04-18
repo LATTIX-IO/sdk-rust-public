@@ -1,0 +1,38 @@
+Lattix SDK License
+Copyright (c) 2026 Lattix. All rights reserved.
+
+This software is proprietary and confidential to Lattix.
+
+Subject to the terms of your applicable commercial agreement with Lattix, or a
+separate written evaluation agreement issued by Lattix, you are granted a
+limited, non-exclusive, non-transferable, revocable license to use unmodified
+copies of this software solely to develop, test, and operate integrations with
+licensed Lattix products and services.
+
+Except as expressly permitted above or by applicable law, you may not:
+
+1. modify, adapt, translate, or create derivative works of this software;
+2. redistribute, sublicense, publish, lease, lend, sell, or otherwise make this
+   software available to any third party;
+3. reverse engineer, decompile, disassemble, or otherwise attempt to derive
+   source, protocol details, or non-public implementation details from any
+   compiled form of this software;
+4. remove or obscure proprietary notices or branding; or
+5. use Lattix trademarks except to identify the software in a customary and
+   truthful manner.
+
+SDK reference material distributed with this package is part of the licensed
+software. Public documentation at https://lattix.io/docs does not grant any
+additional rights beyond the license above.
+
+If you do not have an applicable agreement with Lattix, no license is granted.
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY
+KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT,
+EXCEPT TO THE EXTENT SUCH DISCLAIMERS ARE NOT PERMITTED BY APPLICABLE LAW.
+
+IN NO EVENT WILL LATTIX BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES, OR FOR ANY LOSS OF USE, DATA, BUSINESS,
+REVENUE, OR PROFITS, ARISING FROM OR RELATING TO THIS SOFTWARE, EXCEPT TO THE
+EXTENT A WRITTEN AGREEMENT WITH LATTIX EXPRESSLY PROVIDES OTHERWISE.

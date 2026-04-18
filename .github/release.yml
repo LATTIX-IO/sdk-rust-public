@@ -1,0 +1,49 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: SDK surface
+      labels:
+        - sdk-surface
+        - api
+    - title: Native ABI and bindings
+      labels:
+        - ffi
+        - bindings
+        - native-assets
+    - title: Tooling and quality
+      labels:
+        - tooling
+        - ci
+        - security
+        - docs
+
+template: |
+  ## Release summary
+
+  - SDK version: <!-- replace with crate version -->
+  - Matching native asset set: <!-- confirm Windows/Linux/macOS assets -->
+  - Matching downstream binding versions: <!-- link sdk-go/sdk-python if applicable -->
+
+  ## Native asset checklist
+
+  - [ ] `sdk-rust-native-windows-x86_64.zip` attached
+  - [ ] `sdk-rust-native-linux-x86_64.tar.gz` attached
+  - [ ] `sdk-rust-native-macos-x86_64.tar.gz` attached
+  - [ ] `sdk-rust-native-macos-aarch64.tar.gz` attached
+  - [ ] Archive contents include `include/lattix_sdk.h`
+  - [ ] ABI changes called out explicitly
+
+  ## Highlights
+
+  $CHANGES
+
+  ## Compatibility notes
+
+  - Confirm whether this release is ABI-compatible with the prior tagged release.
+  - Confirm whether downstream `sdk-go` and `sdk-python` should consume this exact tag.
+
+  ## Contributors
+
+  $CONTRIBUTORS
