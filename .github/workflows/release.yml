@@ -35,6 +35,8 @@ jobs:
       - name: Verify tag and crate version
         id: version
         shell: bash
+        env:
+          INPUT_PUBLISH: ${{ inputs.publish }}
         run: |
           set -euo pipefail
           crate_version=$(cargo metadata --no-deps --format-version 1 | python -c "import json,sys; print(json.load(sys.stdin)['packages'][0]['version'])")
@@ -47,7 +49,7 @@ jobs:
             fi
           fi
           should_publish=false
-          if [[ "${GITHUB_EVENT_NAME}" == "push" || "${{ inputs.publish }}" == "true" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "push" || "${INPUT_PUBLISH:-false}" == "true" ]]; then
             should_publish=true
           fi
           echo "crate_version=${crate_version}" >> "$GITHUB_OUTPUT"
@@ -64,15 +66,23 @@ jobs:
           - os: ubuntu-latest
             archive_name: sdk-rust-native-linux-x86_64.tar.gz
             library_name: libsdk_rust.so
-          - os: macos-13
+            rust_target: ''
+            library_dir: target/release
+          - os: macos-14
             archive_name: sdk-rust-native-macos-x86_64.tar.gz
             library_name: libsdk_rust.dylib
+            rust_target: x86_64-apple-darwin
+            library_dir: target/x86_64-apple-darwin/release
           - os: macos-14
             archive_name: sdk-rust-native-macos-aarch64.tar.gz
             library_name: libsdk_rust.dylib
+            rust_target: ''
+            library_dir: target/release
           - os: windows-latest
             archive_name: sdk-rust-native-windows-x86_64.zip
             library_name: sdk_rust.dll
+            rust_target: ''
+            library_dir: target/release
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,11 +90,23 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install extra Rust target
+        if: ${{ matrix.rust_target != '' }}
+        shell: bash
+        run: rustup target add "${{ matrix.rust_target }}"
+
       - name: Cache Cargo artifacts
         uses: Swatinem/rust-cache@v2
 
       - name: Build release library
+        if: ${{ matrix.rust_target == '' }}
+        shell: bash
         run: cargo build --release
+
+      - name: Build release library for explicit target
+        if: ${{ matrix.rust_target != '' }}
+        shell: bash
+        run: cargo build --release --target "${{ matrix.rust_target }}"
 
       - name: Package native archive (Unix)
         if: runner.os != 'Windows'
@@ -93,7 +115,7 @@ jobs:
           set -euo pipefail
           archive_root="dist/native"
           mkdir -p "${archive_root}/include"
-          cp "target/release/${{ matrix.library_name }}" "${archive_root}/"
+          cp "${{ matrix.library_dir }}/${{ matrix.library_name }}" "${archive_root}/"
           cp "include/lattix_sdk.h" "${archive_root}/include/"
           tar -C dist -czf "dist/${{ matrix.archive_name }}" native
 
@@ -103,7 +125,7 @@ jobs:
         run: |
           $archiveRoot = Join-Path $PWD 'dist/native'
           New-Item -ItemType Directory -Force -Path (Join-Path $archiveRoot 'include') | Out-Null
-          Copy-Item (Join-Path $PWD 'target/release/${{ matrix.library_name }}') $archiveRoot -Force
+          Copy-Item (Join-Path $PWD '${{ matrix.library_dir }}/${{ matrix.library_name }}') $archiveRoot -Force
           Copy-Item (Join-Path $PWD 'include/lattix_sdk.h') (Join-Path $archiveRoot 'include/lattix_sdk.h') -Force
           Compress-Archive -Path (Join-Path $PWD 'dist/native/*') -DestinationPath (Join-Path $PWD 'dist/${{ matrix.archive_name }}') -Force
 
@@ -142,7 +164,7 @@ jobs:
     permissions:
       contents: read
     env:
-      MIRROR_TOKEN: ${{ secrets.SDK_RUST_PUBLIC_MIRROR_TOKEN }}
+      MIRROR_TOKEN: ${{ secrets.GH_PAT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -160,7 +182,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${MIRROR_TOKEN:-}" ]]; then
-            echo "::error::SDK_RUST_PUBLIC_MIRROR_TOKEN secret is not configured for sdk-rust releases." >&2
+            echo "::error::GH_PAT secret is not configured for sdk-rust releases." >&2
             exit 1
           fi
 
@@ -201,7 +223,7 @@ jobs:
       - name: Publish mirrored GitHub release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.SDK_RUST_PUBLIC_MIRROR_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           tag_name="${{ needs.verify-version.outputs.tag_name }}"

@@ -12,7 +12,7 @@ The supported automation path is:
 The repository itself may remain private if crates.io is the public source of
 truth for Rust consumers. The release workflow requires a
 `CARGO_REGISTRY_TOKEN` GitHub Actions secret to perform the real publish step.
-The workflow also requires an `SDK_RUST_PUBLIC_MIRROR_TOKEN` secret with push
+The workflow also requires a `GH_PAT` secret with push
 access to `LATTIX-IO/sdk-rust-public` so the public mirror repository receives
 the same source snapshot, tag, and native release assets.
 
@@ -42,7 +42,7 @@ the same source snapshot, tag, and native release assets.
    - `sdk-rust-native-macos-aarch64.tar.gz`
 5. Confirm the release notes generated from `.github/release.yml` and `.github/RELEASE_TEMPLATE.md` call out any ABI changes explicitly.
 6. Confirm the `CARGO_REGISTRY_TOKEN` secret is configured for the repository.
-7. Confirm the `SDK_RUST_PUBLIC_MIRROR_TOKEN` secret is configured for the repository.
+7. Confirm the `GH_PAT` secret is configured for the repository and can push to `LATTIX-IO/sdk-rust-public`.
 8. Let the workflow publish the crate to crates.io after both the private release and the `sdk-rust-public` mirror release exist with the native assets attached.
 
 ## Notes
