@@ -177,16 +177,20 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Verify public mirror token is configured
+      - name: Check mirror token availability
+        id: mirror_token
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${MIRROR_TOKEN:-}" ]]; then
-            echo "::error::GH_PAT secret is not configured for sdk-rust releases." >&2
-            exit 1
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GH_PAT secret is not configured; skipping public mirror release sync."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure git identity
+        if: ${{ steps.mirror_token.outputs.enabled == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -194,6 +198,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Sync repository contents to public mirror
+        if: ${{ steps.mirror_token.outputs.enabled == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -221,6 +226,7 @@ jobs:
           popd >/dev/null
 
       - name: Publish mirrored GitHub release
+        if: ${{ steps.mirror_token.outputs.enabled == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -243,7 +249,6 @@ jobs:
     needs:
       - verify-version
       - github-release
-      - public-mirror-release
     runs-on: ubuntu-latest
     permissions:
       contents: read
