@@ -23,6 +23,34 @@ function Get-Tool {
   return $null
 }
 
+function Get-TrivyVersion {
+  param([string]$ToolPath)
+
+  $versionOutput = (& $ToolPath --version 2>$null) -join [Environment]::NewLine
+  if (-not $versionOutput) {
+    $versionOutput = (& $ToolPath version 2>$null) -join [Environment]::NewLine
+  }
+
+  if ($versionOutput -match '(?<version>\d+\.\d+\.\d+)') {
+    return $Matches.version
+  }
+
+  return $null
+}
+
+function Assert-SafeTrivyVersion {
+  param([string]$ToolPath)
+
+  $version = Get-TrivyVersion -ToolPath $ToolPath
+  if (-not $version) {
+    throw "Refusing to run Trivy because its version could not be determined. Install Trivy v0.69.3 or v0.69.2."
+  }
+
+  if ($version -in @('0.69.4', '0.69.5', '0.69.6')) {
+    throw "Refusing to run compromised Trivy $version (GHSA-69fq-xp46-6x23 / CVE-2026-33634). Install Trivy v0.69.3 or v0.69.2."
+  }
+}
+
 function Invoke-OptionalTool {
   param(
     [string]$Name,
@@ -34,6 +62,10 @@ function Invoke-OptionalTool {
   if (-not $tool) {
     Write-Host " - Skipping $Description (missing $Name)"
     return
+  }
+
+  if ($Name -eq 'trivy') {
+    Assert-SafeTrivyVersion -ToolPath $tool
   }
 
   Write-Host " - $Description"

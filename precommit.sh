@@ -41,12 +41,45 @@ find_cmd() {
   return 1
 }
 
+trivy_version_for() {
+  local trivy_bin="$1"
+  local version_output
+
+  version_output="$("$trivy_bin" --version 2>/dev/null || "$trivy_bin" version 2>/dev/null || true)"
+  if [[ "$version_output" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  fi
+}
+
+ensure_safe_trivy_version() {
+  local trivy_bin="$1"
+  local version
+
+  version="$(trivy_version_for "$trivy_bin")"
+  if [[ -z "$version" ]]; then
+    echo " - Refusing to run Trivy because its version could not be determined." >&2
+    echo "   Install a known-safe Trivy release such as v0.69.3 or v0.69.2." >&2
+    return 1
+  fi
+
+  case "$version" in
+    0.69.4|0.69.5|0.69.6)
+      echo " - Refusing to run compromised Trivy $version (GHSA-69fq-xp46-6x23 / CVE-2026-33634)." >&2
+      echo "   Install Trivy v0.69.3 or v0.69.2 before re-running precommit." >&2
+      return 1
+      ;;
+  esac
+}
+
 run_if_available() {
   local cmd="$1"
   local desc="$2"
   shift 2
   local cmd_bin
   if cmd_bin="$(find_cmd "$cmd")"; then
+    if [[ "$cmd" == "trivy" ]]; then
+      ensure_safe_trivy_version "$cmd_bin"
+    fi
     echo " - $desc"
     "$cmd_bin" "$@"
   else
