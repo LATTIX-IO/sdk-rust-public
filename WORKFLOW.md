@@ -7,6 +7,8 @@ tracker:
   active_states:
     - Todo
     - In Progress
+  exclude_labels:
+    - epic
   terminal_states:
     - Closed
     - Cancelled
@@ -39,10 +41,11 @@ agent:
     todo: 1
     in progress: 2
 codex:
-  command: codex app-server
+  command: codex app-server -c model="gpt-5.5" -c model_reasoning_effort="medium"
   turn_timeout_ms: 3600000
   read_timeout_ms: 5000
   stall_timeout_ms: 300000
+  approval_policy: never
 symphony:
   repo: "sdk-rust-public"
   path: "sdk-rust-public"
