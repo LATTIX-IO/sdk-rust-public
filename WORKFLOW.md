@@ -41,7 +41,7 @@ agent:
     todo: 1
     in progress: 2
 codex:
-  command: codex app-server -c model="gpt-5.5" -c model_reasoning_effort="medium"
+  command: codex app-server -c model="gpt-5.5" -c model_reasoning_effort="low"
   turn_timeout_ms: 3600000
   read_timeout_ms: 5000
   stall_timeout_ms: 300000
