@@ -35,8 +35,18 @@ The Rust client currently supports the `/v1/sdk/*` control-plane operations used
 - `key_access_plan(...)`
 - `artifact_register(...)`
 - `evidence(...)`
+- `prepare_local_protection(...)`
+- `generate_cid_binding(...)`
+- `protect_bytes_with_envelope(...)`
+- `access_bytes_with_envelope(...)`
 
-These operations are intentionally **metadata only**. Applications protect or access content locally; the platform resolves policy, identity, and key-handling plans from metadata.
+The control-plane operations are intentionally **metadata only**. Applications protect or access content locally; the platform resolves policy, identity, and key-handling plans from metadata. The local helper methods build on top of that control plane while keeping plaintext in-process.
+
+`prepare_local_protection(...)` is the first embedded-enforcement helper on top of that control plane. It digests content in-process, derives a raw SHA-256 CID/digest binding, calls `bootstrap`, `policy_resolve`, and `protection_plan`, and fails closed if the platform contract stops requiring local-only handling.
+
+`generate_cid_binding(...)` exposes the portable tenant/resource/policy binding directly, so callers can persist or inspect the deterministic CID linkage before encrypting or signing bytes.
+
+`protect_bytes_with_envelope(...)` and `access_bytes_with_envelope(...)` extend that into a real in-process envelope workflow for the envelope artifact profile. The current implementation uses a caller-supplied symmetric key, keeps plaintext in-process, binds metadata as AEAD AAD, and still calls key planning, artifact registration, and evidence ingestion.
 
 ## Usage
 
@@ -77,9 +87,82 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     println!("protect locally: {}", plan.execution.protect_locally);
+
+    let prepared = client.prepare_local_protection(
+        b"hello world",
+        sdk_rust::LocalProtectionRequest {
+            workload: WorkloadDescriptor {
+                application: "example-app".to_string(),
+                environment: Some("dev".to_string()),
+                component: Some("worker".to_string()),
+            },
+            resource: ResourceDescriptor {
+                kind: "document".to_string(),
+                id: Some("doc-123".to_string()),
+                mime_type: Some("application/pdf".to_string()),
+            },
+            preferred_artifact_profile: Some(ArtifactProfile::Tdf),
+            purpose: Some("store".to_string()),
+            labels: vec!["confidential".to_string()],
+            attributes: std::collections::BTreeMap::new(),
+        },
+    )?;
+
+    println!("content digest: {}", prepared.content_binding.content_digest);
+
+    let cid_binding = client.generate_cid_binding(
+        b"hello world",
+        sdk_rust::LocalProtectionRequest {
+            workload: WorkloadDescriptor {
+                application: "example-app".to_string(),
+                environment: Some("dev".to_string()),
+                component: Some("worker".to_string()),
+            },
+            resource: ResourceDescriptor {
+                kind: "document".to_string(),
+                id: Some("doc-123".to_string()),
+                mime_type: Some("application/pdf".to_string()),
+            },
+            preferred_artifact_profile: Some(ArtifactProfile::Envelope),
+            purpose: Some("store".to_string()),
+            labels: vec!["confidential".to_string()],
+            attributes: std::collections::BTreeMap::from([
+                ("region".to_string(), "us".to_string()),
+            ]),
+        },
+    )?;
+
+    println!("cid binding hash: {}", cid_binding.binding_hash);
+
+    let key = sdk_rust::LocalSymmetricKey::from([7u8; 32]);
+    let protected = client.protect_bytes_with_envelope(
+        &key,
+        b"hello world",
+        sdk_rust::LocalProtectionRequest {
+            workload: WorkloadDescriptor {
+                application: "example-app".to_string(),
+                environment: Some("dev".to_string()),
+                component: Some("worker".to_string()),
+            },
+            resource: ResourceDescriptor {
+                kind: "document".to_string(),
+                id: Some("doc-123".to_string()),
+                mime_type: Some("application/pdf".to_string()),
+            },
+            preferred_artifact_profile: Some(ArtifactProfile::Envelope),
+            purpose: Some("store".to_string()),
+            labels: vec!["confidential".to_string()],
+            attributes: std::collections::BTreeMap::new(),
+        },
+    )?;
+
+    let accessed = client.access_bytes_with_envelope(&key, &protected.artifact.artifact_bytes)?;
+    println!("decrypted bytes: {}", String::from_utf8_lossy(&accessed.plaintext));
     Ok(())
 }
 ```
+
+The returned `LocalArtifactBinding` is the portable metadata object that links tenant, workload, resource, digest, raw CID, and policy-binding targets. It is the simplest entry point when you want deterministic CID lineage without yet creating a protected artifact.
 
 Run the example with:
 

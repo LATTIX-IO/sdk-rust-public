@@ -19,9 +19,16 @@ targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
+aes-gcm = { version = "0.10", features = ["aes"] }
+base64 = "0.22"
+ed25519-dalek = "2"
+hex = "0.4"
+rand = { version = "0.8", features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 ureq = { version = "2", default-features = true, features = ["json"] }
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 
 [dev-dependencies]
 mockito = "1"

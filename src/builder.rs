@@ -1,21 +1,19 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
-    client::{Client, ClientAuthStrategy, SdkClientCredentialsAuth},
+    client::{Client, ClientAuthStrategy},
     error::SdkError,
+    providers::{ManagedSymmetricKeyProvider, ManagedSymmetricKeyProviderRegistry},
 };
 
 pub struct ClientBuilder {
     base_url: String,
     bearer_token: Option<String>,
-    client_id: Option<String>,
-    client_secret: Option<String>,
     tenant_id: Option<String>,
     user_id: Option<String>,
     timeout_secs: Option<u64>,
-    token_exchange_path: Option<String>,
-    requested_scopes: Vec<String>,
     headers: BTreeMap<String, String>,
+    managed_symmetric_key_provider_registry: ManagedSymmetricKeyProviderRegistry,
 }
 
 impl ClientBuilder {
@@ -23,50 +21,16 @@ impl ClientBuilder {
         Self {
             base_url: base_url.into(),
             bearer_token: None,
-            client_id: None,
-            client_secret: None,
             tenant_id: None,
             user_id: None,
             timeout_secs: None,
-            token_exchange_path: None,
-            requested_scopes: Vec::new(),
             headers: BTreeMap::new(),
+            managed_symmetric_key_provider_registry: ManagedSymmetricKeyProviderRegistry::new(),
         }
     }
 
     pub fn with_bearer_token(mut self, bearer_token: impl Into<String>) -> Self {
         self.bearer_token = Some(bearer_token.into());
-        self
-    }
-
-    pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
-        self.client_id = Some(client_id.into());
-        self
-    }
-
-    pub fn with_client_secret(mut self, client_secret: impl Into<String>) -> Self {
-        self.client_secret = Some(client_secret.into());
-        self
-    }
-
-    pub fn with_token_exchange_path(mut self, token_exchange_path: impl Into<String>) -> Self {
-        self.token_exchange_path = Some(token_exchange_path.into());
-        self
-    }
-
-    pub fn with_requested_scopes<I, S>(mut self, scopes: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.requested_scopes = scopes
-            .into_iter()
-            .map(Into::into)
-            .map(|scope| scope.trim().to_string())
-            .filter(|scope| !scope.is_empty())
-            .collect();
-        self.requested_scopes.sort();
-        self.requested_scopes.dedup();
         self
     }
 
@@ -87,6 +51,24 @@ impl ClientBuilder {
 
     pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn with_managed_symmetric_key_provider<P>(mut self, provider: P) -> Self
+    where
+        P: ManagedSymmetricKeyProvider + 'static,
+    {
+        self.managed_symmetric_key_provider_registry
+            .register(provider);
+        self
+    }
+
+    pub fn with_managed_symmetric_key_provider_arc(
+        mut self,
+        provider: Arc<dyn ManagedSymmetricKeyProvider>,
+    ) -> Self {
+        self.managed_symmetric_key_provider_registry
+            .register_arc(provider);
         self
     }
 
@@ -127,40 +109,7 @@ impl ClientBuilder {
                 )))
             }
         } else {
-            match (self.client_id, self.client_secret) {
-                (Some(client_id), Some(client_secret)) => {
-                    let tenant_id = tenant_id.ok_or_else(|| {
-                        SdkError::InvalidInput(
-                            "tenant_id is required when sdk client credentials are configured"
-                                .to_string(),
-                        )
-                    })?;
-                    let client_id = client_id.trim().to_string();
-                    let client_secret = client_secret.trim().to_string();
-                    if client_id.is_empty() || client_secret.is_empty() {
-                        return Err(SdkError::InvalidInput(
-                            "client_id and client_secret cannot be empty".to_string(),
-                        ));
-                    }
-
-                    Some(ClientAuthStrategy::SdkClientCredentials(Box::new(
-                        SdkClientCredentialsAuth::new(
-                            tenant_id,
-                            client_id,
-                            client_secret,
-                            self.token_exchange_path
-                                .unwrap_or_else(|| "/v1/sdk/session".to_string()),
-                            self.requested_scopes,
-                        ),
-                    )))
-                }
-                (None, None) => None,
-                _ => {
-                    return Err(SdkError::InvalidInput(
-                        "client_id and client_secret must be provided together".to_string(),
-                    ));
-                }
-            }
+            None
         };
 
         Ok(Client::new(
@@ -168,6 +117,7 @@ impl ClientBuilder {
             agent_builder.build(),
             headers,
             auth_strategy,
+            self.managed_symmetric_key_provider_registry,
         ))
     }
 }

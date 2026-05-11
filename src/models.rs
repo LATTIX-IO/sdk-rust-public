@@ -10,6 +10,43 @@ pub enum AuthMode {
     BearerTokenOrTrustedHeaders,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SdkAuthConfigurationMode {
+    BearerTokenValidation,
+    OauthClientCredentials,
+}
+
+impl Default for SdkAuthConfigurationMode {
+    fn default() -> Self {
+        Self::BearerTokenValidation
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SdkProofOfPossession {
+    Mtls,
+    Dpop,
+}
+
+impl Default for SdkProofOfPossession {
+    fn default() -> Self {
+        Self::Mtls
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct SdkAuthConfiguration {
+    pub mode: SdkAuthConfigurationMode,
+    pub proof_of_possession: SdkProofOfPossession,
+    pub oidc_issuer: Option<String>,
+    pub oidc_audience: Option<String>,
+    pub oidc_issuer_ready: bool,
+    pub mtls_ready: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct RequestContext {
@@ -37,6 +74,8 @@ pub struct SdkCapabilitiesResponse {
     pub service: String,
     pub status: String,
     pub auth_mode: AuthMode,
+    #[serde(default)]
+    pub auth_configuration: SdkAuthConfiguration,
     pub caller: RequestContext,
     #[serde(default)]
     pub default_required_scopes: Vec<String>,
@@ -68,6 +107,26 @@ pub enum ArtifactProfile {
     DetachedSignature,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyTransportMode {
+    LocalProvided,
+    WrappedKeyReference,
+    AuthorizedKeyRelease,
+    KemEncapsulatedCek,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct KeyTransportGuidance {
+    pub mode: KeyTransportMode,
+    pub key_material_origin: String,
+    pub stable_key_reference_preferred: bool,
+    pub raw_key_delivery_forbidden: bool,
+    pub public_key_distribution: Option<String>,
+    pub exchange_algorithm: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct PlatformDomainPlan {
@@ -82,6 +141,8 @@ pub struct SdkBootstrapResponse {
     pub service: String,
     pub status: String,
     pub auth_mode: AuthMode,
+    #[serde(default)]
+    pub auth_configuration: SdkAuthConfiguration,
     pub caller: RequestContext,
     pub enforcement_model: String,
     pub plaintext_to_platform: bool,
@@ -92,18 +153,6 @@ pub struct SdkBootstrapResponse {
     pub supported_artifact_profiles: Vec<ArtifactProfile>,
     #[serde(default)]
     pub platform_domains: Vec<PlatformDomainPlan>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub struct SdkSessionExchangeResponse {
-    pub access_token: String,
-    pub token_type: String,
-    pub expires_in: u64,
-    pub scope: String,
-    pub tenant_id: String,
-    pub client_id: String,
-    pub subject: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -177,6 +226,8 @@ pub struct ProtectionExecutionPlan {
     pub artifact_profile: ArtifactProfile,
     pub key_strategy: String,
     pub policy_resolution: String,
+    #[serde(default)]
+    pub key_transport: Option<KeyTransportGuidance>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -327,6 +378,8 @@ pub struct KeyAccessExecutionPlan {
     pub send_only: Vec<String>,
     pub artifact_profile: ArtifactProfile,
     pub authorization_strategy: String,
+    #[serde(default)]
+    pub key_transport: Option<KeyTransportGuidance>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

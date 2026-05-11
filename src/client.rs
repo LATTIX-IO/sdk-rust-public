@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::collections::BTreeMap;
 
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -13,109 +9,13 @@ use crate::{
         CallerIdentityResponse, SdkArtifactRegisterRequest, SdkArtifactRegisterResponse,
         SdkBootstrapResponse, SdkCapabilitiesResponse, SdkEvidenceIngestRequest,
         SdkEvidenceIngestResponse, SdkKeyAccessPlanRequest, SdkKeyAccessPlanResponse,
-        SdkPolicyResolveRequest, SdkPolicyResolveResponse, SdkProtectionPlanRequest,
-        SdkProtectionPlanResponse, SdkSessionExchangeResponse,
+        SdkPolicyResolveRequest, SdkPolicyResolveResponse, SdkProtectionPlanRequest, SdkProtectionPlanResponse,
     },
+    providers::ManagedSymmetricKeyProviderRegistry,
 };
 
 pub(crate) enum ClientAuthStrategy {
     StaticBearer(String),
-    SdkClientCredentials(Box<SdkClientCredentialsAuth>),
-}
-
-pub(crate) struct SdkClientCredentialsAuth {
-    pub tenant_id: String,
-    pub client_id: String,
-    pub client_secret: String,
-    pub token_exchange_path: String,
-    pub requested_scopes: Vec<String>,
-    cached_session: Mutex<Option<CachedSessionToken>>,
-}
-
-struct CachedSessionToken {
-    response: SdkSessionExchangeResponse,
-    refresh_at: Instant,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-struct SdkSessionExchangeRequest<'a> {
-    tenant_id: &'a str,
-    client_id: &'a str,
-    client_secret: &'a str,
-    requested_scopes: &'a [String],
-}
-
-impl SdkClientCredentialsAuth {
-    pub(crate) fn new(
-        tenant_id: String,
-        client_id: String,
-        client_secret: String,
-        token_exchange_path: String,
-        requested_scopes: Vec<String>,
-    ) -> Self {
-        Self {
-            tenant_id,
-            client_id,
-            client_secret,
-            token_exchange_path,
-            requested_scopes,
-            cached_session: Mutex::new(None),
-        }
-    }
-
-    fn resolve_access_token(
-        &self,
-        agent: &ureq::Agent,
-        base_url: &str,
-    ) -> Result<SdkSessionExchangeResponse, SdkError> {
-        {
-            let cache = self.cached_session.lock().map_err(|_| {
-                SdkError::Connection("failed to acquire sdk session cache".to_string())
-            })?;
-            if let Some(cached) = cache.as_ref()
-                && Instant::now() < cached.refresh_at
-            {
-                return Ok(cached.response.clone());
-            }
-        }
-
-        let endpoint = if self.token_exchange_path.starts_with("http://")
-            || self.token_exchange_path.starts_with("https://")
-        {
-            self.token_exchange_path.clone()
-        } else {
-            format!("{}{}", base_url, self.token_exchange_path)
-        };
-        let response = post_json_with_agent::<_, SdkSessionExchangeResponse>(
-            agent,
-            &endpoint,
-            &SdkSessionExchangeRequest {
-                tenant_id: &self.tenant_id,
-                client_id: &self.client_id,
-                client_secret: &self.client_secret,
-                requested_scopes: &self.requested_scopes,
-            },
-            &BTreeMap::new(),
-        )?;
-
-        let refresh_after_secs = if response.expires_in > 60 {
-            response.expires_in - 60
-        } else {
-            1
-        };
-
-        let mut cache = self
-            .cached_session
-            .lock()
-            .map_err(|_| SdkError::Connection("failed to update sdk session cache".to_string()))?;
-        *cache = Some(CachedSessionToken {
-            response: response.clone(),
-            refresh_at: Instant::now() + Duration::from_secs(refresh_after_secs),
-        });
-
-        Ok(response)
-    }
 }
 
 pub struct Client {
@@ -123,6 +23,7 @@ pub struct Client {
     pub(crate) agent: ureq::Agent,
     pub(crate) default_headers: BTreeMap<String, String>,
     pub(crate) auth_strategy: Option<ClientAuthStrategy>,
+    pub(crate) managed_symmetric_key_provider_registry: ManagedSymmetricKeyProviderRegistry,
 }
 
 impl Client {
@@ -131,12 +32,14 @@ impl Client {
         agent: ureq::Agent,
         default_headers: BTreeMap<String, String>,
         auth_strategy: Option<ClientAuthStrategy>,
+        managed_symmetric_key_provider_registry: ManagedSymmetricKeyProviderRegistry,
     ) -> Self {
         Self {
             base_url,
             agent,
             default_headers,
             auth_strategy,
+            managed_symmetric_key_provider_registry,
         }
     }
 
@@ -158,21 +61,6 @@ impl Client {
 
     pub fn bootstrap(&self) -> Result<SdkBootstrapResponse, SdkError> {
         self.get_json("/v1/sdk/bootstrap")
-    }
-
-    pub fn exchange_session(&self) -> Result<SdkSessionExchangeResponse, SdkError> {
-        match self.auth_strategy.as_ref() {
-            Some(ClientAuthStrategy::SdkClientCredentials(auth)) => {
-                auth.resolve_access_token(&self.agent, &self.base_url)
-            }
-            Some(ClientAuthStrategy::StaticBearer(_)) => Err(SdkError::InvalidInput(
-                "client is configured with a static bearer token; no sdk session exchange is required"
-                    .to_string(),
-            )),
-            None => Err(SdkError::InvalidInput(
-                "client is not configured with sdk client credentials".to_string(),
-            )),
-        }
     }
 
     pub fn protection_plan(
@@ -259,34 +147,9 @@ impl Client {
     fn resolve_authorization_header(&self) -> Result<Option<String>, SdkError> {
         match self.auth_strategy.as_ref() {
             Some(ClientAuthStrategy::StaticBearer(header)) => Ok(Some(header.clone())),
-            Some(ClientAuthStrategy::SdkClientCredentials(auth)) => {
-                let session = auth.resolve_access_token(&self.agent, &self.base_url)?;
-                Ok(Some(format!("Bearer {}", session.access_token)))
-            }
             None => Ok(None),
         }
     }
-}
-
-fn post_json_with_agent<TReq, TRes>(
-    agent: &ureq::Agent,
-    endpoint: &str,
-    payload: &TReq,
-    headers: &BTreeMap<String, String>,
-) -> Result<TRes, SdkError>
-where
-    TReq: Serialize,
-    TRes: DeserializeOwned,
-{
-    let payload_json = serde_json::to_string(payload).map_err(|error| {
-        SdkError::Serialization(format!("failed to serialize request payload: {error}"))
-    })?;
-    let mut request = agent.post(endpoint).set("Content-Type", "application/json");
-    for (name, value) in headers {
-        request = request.set(name, value);
-    }
-    let response = request.send_string(&payload_json).map_err(map_ureq_error)?;
-    decode_response(response)
 }
 
 fn decode_response<T>(response: ureq::Response) -> Result<T, SdkError>

@@ -18,12 +18,12 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/lattix/.symphony/workspaces/sdk-rust-public"
+  root: "D:/lattix/.symphony/workspaces/sdk-rust"
 hooks:
   timeout_ms: 120000
   after_create: |
     set -euo pipefail
-    git clone --recurse-submodules --branch "main" "https://github.com/LATTIX-IO/sdk-rust-public.git" .
+    git clone --recurse-submodules --branch "main" "https://github.com/LATTIX-IO/sdk-rust.git" .
   before_run: |
     set -euo pipefail
     if [ -d .git ] && [ -z "$(git status --porcelain)" ]; then
@@ -47,9 +47,9 @@ codex:
   stall_timeout_ms: 300000
   approval_policy: never
 symphony:
-  repo: "sdk-rust-public"
-  path: "sdk-rust-public"
-  remote: "https://github.com/LATTIX-IO/sdk-rust-public.git"
+  repo: "sdk-rust"
+  path: "sdk-rust"
+  remote: "https://github.com/LATTIX-IO/sdk-rust.git"
   default_branch: "main"
   linear_project_name: "Testing, Quality & Documentation"
   technologies:
@@ -57,9 +57,9 @@ symphony:
     - docs
 ---
 
-# Symphony Workflow — sdk-rust-public
+# Symphony Workflow — sdk-rust
 
-You are the coding agent for **sdk-rust-public** (sdk-rust-public) running under Symphony. Symphony has selected this Linear issue and created an isolated per-issue workspace for you. Treat the workspace as the only place where commands and file edits may run.
+You are the coding agent for **sdk-rust** (sdk-rust) running under Symphony. Symphony has selected this Linear issue and created an isolated per-issue workspace for you. Treat the workspace as the only place where commands and file edits may run.
 
 ## Issue context
 
@@ -73,7 +73,7 @@ Use the issue description, labels, blockers, linked assets, and repository conte
 ## Repository profile
 
 - Linear project: Testing, Quality & Documentation (289d946064d4)
-- Repository path: sdk-rust-public
+- Repository path: sdk-rust
 - Default branch: main
 - Detected technology profile: rust, docs
 
