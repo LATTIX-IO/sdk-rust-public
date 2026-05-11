@@ -197,6 +197,21 @@ Run Rust unit tests plus FFI smoke tests with:
 cargo test
 ```
 
+The shared integration-full contract tests load the canonical scenario from
+`prop-system-tests/fixtures/sdk_api_e2e/integration_full_manifest.json`. In the
+monorepo they resolve that path automatically; in standalone CI or local clones,
+set `SDK_API_E2E_INTEGRATION_FULL_MANIFEST_PATH` to point at a checked-out
+`prop-system-tests` fixture tree.
+
+To run the optional composed-environment smoke against a real target, provide
+the composed endpoint env and execute the dedicated integration test:
+
+```bash
+SDK_API_E2E_INTEGRATION_FULL_BASE_URL=https://api.example \
+SDK_API_E2E_INTEGRATION_FULL_MANIFEST_PATH=/path/to/prop-system-tests/fixtures/sdk_api_e2e/integration_full_manifest.json \
+cargo test --test integration_full_composed -- --nocapture
+```
+
 Build the native artifacts used by downstream bindings with:
 
 ```bash

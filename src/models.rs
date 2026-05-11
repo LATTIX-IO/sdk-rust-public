@@ -10,30 +10,20 @@ pub enum AuthMode {
     BearerTokenOrTrustedHeaders,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SdkAuthConfigurationMode {
+    #[default]
     BearerTokenValidation,
     OauthClientCredentials,
 }
 
-impl Default for SdkAuthConfigurationMode {
-    fn default() -> Self {
-        Self::BearerTokenValidation
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SdkProofOfPossession {
+    #[default]
     Mtls,
     Dpop,
-}
-
-impl Default for SdkProofOfPossession {
-    fn default() -> Self {
-        Self::Mtls
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

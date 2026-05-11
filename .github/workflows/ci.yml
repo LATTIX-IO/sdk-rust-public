@@ -6,6 +6,28 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_integration_full_composed:
+        description: Run the shared integration-full scenario against a composed environment
+        required: false
+        type: boolean
+        default: false
+      integration_full_base_url:
+        description: Base URL for the composed integration-full target
+        required: false
+        type: string
+      integration_full_tenant_id:
+        description: Optional tenant ID header for the composed integration-full target
+        required: false
+        type: string
+      integration_full_user_id:
+        description: Optional user ID header for the composed integration-full target
+        required: false
+        type: string
+      integration_full_bearer_token_secret_name:
+        description: Secret name that stores the bearer token for the composed integration-full target
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -13,9 +35,19 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      SDK_API_E2E_INTEGRATION_FULL_MANIFEST_PATH: ${{ github.workspace }}/prop-system-tests/fixtures/sdk_api_e2e/integration_full_manifest.json
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout shared integration fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: LATTIX-IO/prop-system-tests
+          ref: feat/sdk-api-e2e-shared-fixture-20260510
+          path: prop-system-tests
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -29,11 +61,68 @@ jobs:
       - name: Lint with clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Run shared integration-full contract tests
+        run: cargo test integration_full_runner
+
       - name: Run tests
         run: cargo test --all-targets --all-features
 
       - name: Build release artifacts
         run: cargo build --release
 
+      - name: Remove shared fixture checkout before packaging
+        run: rm -rf prop-system-tests
+
       - name: Verify crate packaging
         run: cargo package --locked
+
+  integration-full-composed:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_integration_full_composed
+    runs-on: ubuntu-latest
+    env:
+      SDK_API_E2E_INTEGRATION_FULL_MANIFEST_PATH: ${{ github.workspace }}/prop-system-tests/fixtures/sdk_api_e2e/integration_full_manifest.json
+      SDK_API_E2E_INTEGRATION_FULL_BASE_URL: ${{ inputs.integration_full_base_url }}
+      SDK_API_E2E_INTEGRATION_FULL_BEARER_TOKEN: ${{ secrets[inputs.integration_full_bearer_token_secret_name] }}
+      SDK_API_E2E_INTEGRATION_FULL_TENANT_ID: ${{ inputs.integration_full_tenant_id }}
+      SDK_API_E2E_INTEGRATION_FULL_USER_ID: ${{ inputs.integration_full_user_id }}
+      SDK_API_E2E_INTEGRATION_FULL_ARTIFACT_DIR: ${{ github.workspace }}/output/sdk_rust_integration_full/${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout shared integration fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: LATTIX-IO/prop-system-tests
+          ref: feat/sdk-api-e2e-shared-fixture-20260510
+          path: prop-system-tests
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate composed runner configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SDK_API_E2E_INTEGRATION_FULL_BASE_URL:-}" ]; then
+            echo "::error::SDK_API_E2E_INTEGRATION_FULL_BASE_URL is required" >&2
+            exit 1
+          fi
+          if [ -z "${{ inputs.integration_full_bearer_token_secret_name }}" ]; then
+            echo "::warning::No bearer token secret name was provided; the composed run will proceed without an Authorization header."
+          fi
+
+      - name: Run shared integration-full scenario against composed environment
+        run: cargo test --test integration_full_composed -- --nocapture
+
+      - name: Upload composed runner artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-rust-integration-full-composed-${{ github.run_id }}
+          path: ${{ env.SDK_API_E2E_INTEGRATION_FULL_ARTIFACT_DIR }}
+          if-no-files-found: ignore

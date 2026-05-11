@@ -1,6 +1,6 @@
 [package]
 name = "sdk-rust"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Canonical Rust core for the Lattix metadata-only control-plane SDK"
 readme = "README.md"

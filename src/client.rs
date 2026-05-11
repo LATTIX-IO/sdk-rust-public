@@ -9,7 +9,8 @@ use crate::{
         CallerIdentityResponse, SdkArtifactRegisterRequest, SdkArtifactRegisterResponse,
         SdkBootstrapResponse, SdkCapabilitiesResponse, SdkEvidenceIngestRequest,
         SdkEvidenceIngestResponse, SdkKeyAccessPlanRequest, SdkKeyAccessPlanResponse,
-        SdkPolicyResolveRequest, SdkPolicyResolveResponse, SdkProtectionPlanRequest, SdkProtectionPlanResponse,
+        SdkPolicyResolveRequest, SdkPolicyResolveResponse, SdkProtectionPlanRequest,
+        SdkProtectionPlanResponse,
     },
     providers::ManagedSymmetricKeyProviderRegistry,
 };

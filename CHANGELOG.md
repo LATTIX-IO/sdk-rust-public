@@ -4,9 +4,21 @@ All notable changes to `sdk-rust` are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-11
+
 ### Added
+- Local protection and managed-key runtime support for TDF, envelope, and detached-signature workflows.
+- Additional local and managed-provider test coverage, including release-ready FFI smoke coverage for local protection.
 - Local pre-commit and pre-push quality gates with automated fixes, security scans, tests, release builds, and cleanup.
 - Maintainer release scaffolding for changelog-first releases and native asset pairing notes.
+
+### Changed
+- Aligned the SDK auth contract with the direct bearer plus proof-of-possession control-plane surface.
+- Added integration-full CI dispatch coverage for the shared runner path used by downstream SDK bindings.
+
+### Fixed
+- Updated managed envelope integration-full flows to use the required managed key source references.
+- Hardened release CI so package verification runs cleanly before mirroring and crates.io publication.
 
 ## [0.1.0] - 2026-04-17
 
