@@ -2,3 +2,8 @@
 **/*.rs.bk
 **/*.tmp
 .cgcignore
+
+# Nexus AI memory — local, private pointers (never commit)
+CLAUDE.local.md
+AGENTS.local.md
+.ai-memory/local/
