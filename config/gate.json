@@ -1,0 +1,27 @@
+{
+  "_comment": "Severity-gate thresholds per profile. A value of -1 means unlimited (never fails on that severity). The gate fails (exit 1) when the observed count for a severity exceeds its max. Override per-run with --max-<sev> flags or PENTEST_GATE_MAX_<SEV> env vars.",
+  "profiles": {
+    "local": {
+      "max_critical": 0,
+      "max_high": 0,
+      "max_medium": -1,
+      "max_low": -1,
+      "max_info": -1
+    },
+    "prod": {
+      "max_critical": 0,
+      "max_high": 0,
+      "max_medium": 5,
+      "max_low": -1,
+      "max_info": -1
+    },
+    "appsec": {
+      "_note": "Shift-left PR gate. Starts lenient (fail on critical only) so adoption is not blocked by an initial backlog; tighten max_high to 0 once the baseline is clean.",
+      "max_critical": 0,
+      "max_high": -1,
+      "max_medium": -1,
+      "max_low": -1,
+      "max_info": -1
+    }
+  }
+}

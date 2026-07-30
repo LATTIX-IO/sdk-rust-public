@@ -1,0 +1,2 @@
+# Runtime dependency for machine-readable threat-model validation.
+jsonschema==4.23.0

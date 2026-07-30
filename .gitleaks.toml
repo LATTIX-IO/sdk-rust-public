@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deterministic public-only cryptographic material used by the integration contract fixture"
+paths = ['''^testdata/integration_full_manifest\.json$''']

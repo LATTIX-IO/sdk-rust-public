@@ -7,3 +7,8 @@
 CLAUDE.local.md
 AGENTS.local.md
 .ai-memory/local/
+
+# Repository-local CI provider runtime artifacts
+__pycache__/
+*.py[cod]
+reports/

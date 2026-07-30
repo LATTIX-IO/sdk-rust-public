@@ -1,0 +1,284 @@
+name: Lattix CI security and threat-model gate
+description: Generate or load a threat model, run source and optional active pentesting, update the model, and enforce security thresholds.
+
+inputs:
+  source-dir:
+    description: Source directory to analyze.
+    required: false
+    default: .
+  threat-model-path:
+    description: Repository-relative machine-readable threat model path.
+    required: false
+    default: threatmodel/lattix-threat-model.json
+  gate-profile:
+    description: Severity profile from config/gate.json.
+    required: false
+    default: appsec
+  target-url:
+    description: Optional explicitly authorized preview or test URL for black-box testing.
+    required: false
+    default: ""
+  openapi-url:
+    description: Optional OpenAPI URL for Schemathesis API fuzzing.
+    required: false
+    default: ""
+  threagile-model-path:
+    description: Optional repository-relative Threagile YAML model.
+    required: false
+    default: threatmodel/threagile-model.yaml
+  require-active-pentest:
+    description: Fail unless target-url is supplied and active black-box testing runs.
+    required: false
+    default: "false"
+  source-revision:
+    description: Revision recorded in the generated threat model.
+    required: false
+    default: ""
+
+outputs:
+  threat-model:
+    description: Final machine-readable threat model artifact path.
+    value: ${{ steps.paths.outputs.threat-model }}
+  findings:
+    description: Normalized findings artifact path.
+    value: ${{ steps.paths.outputs.findings }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.12"
+
+    - name: Resolve security gate paths
+      id: paths
+      shell: bash
+      env:
+        INPUT_SOURCE_DIR: ${{ inputs.source-dir }}
+        INPUT_THREAT_MODEL_PATH: ${{ inputs.threat-model-path }}
+        INPUT_THREAGILE_MODEL_PATH: ${{ inputs.threagile-model-path }}
+      run: |
+        set -euo pipefail
+        kit_root="$(cd "${GITHUB_ACTION_PATH}/../../.." && pwd)"
+        source_root="$(cd "${GITHUB_WORKSPACE}/${INPUT_SOURCE_DIR}" && pwd)"
+        run_dir="${RUNNER_TEMP}/lattix-security-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        model_input="${source_root}/${INPUT_THREAT_MODEL_PATH}"
+        threagile_model="${source_root}/${INPUT_THREAGILE_MODEL_PATH}"
+        mkdir -p "${run_dir}"
+        {
+          echo "LATTIX_PENTEST_ROOT=${kit_root}"
+          echo "LATTIX_SOURCE_ROOT=${source_root}"
+          echo "LATTIX_RUN_DIR=${run_dir}"
+          echo "LATTIX_MODEL_INPUT=${model_input}"
+          echo "LATTIX_MODEL_BEFORE=${run_dir}/threat-model.before.json"
+          echo "LATTIX_MODEL_FINAL=${run_dir}/threat-model.json"
+          echo "LATTIX_FINDINGS=${run_dir}/findings.normalized.json"
+          echo "LATTIX_THREAGILE_MODEL=${threagile_model}"
+        } >> "${GITHUB_ENV}"
+        echo "threat-model=${run_dir}/threat-model.json" >> "${GITHUB_OUTPUT}"
+        echo "findings=${run_dir}/findings.normalized.json" >> "${GITHUB_OUTPUT}"
+        if [[ -f "${threagile_model}" ]]; then
+          echo "has-threagile-model=true" >> "${GITHUB_OUTPUT}"
+        else
+          echo "has-threagile-model=false" >> "${GITHUB_OUTPUT}"
+        fi
+
+    - name: Install pentest dependencies
+      shell: bash
+      run: python -m pip install --disable-pip-version-check -r "${LATTIX_PENTEST_ROOT}/requirements-ci-security.txt"
+
+    - name: Create or load machine-readable threat model
+      shell: bash
+      env:
+        INPUT_SOURCE_REVISION: ${{ inputs.source-revision }}
+      run: |
+        revision="${INPUT_SOURCE_REVISION:-${GITHUB_SHA}}"
+        python "${LATTIX_PENTEST_ROOT}/scripts/threat_model_lifecycle.py" prepare \
+          --source "${LATTIX_SOURCE_ROOT}" \
+          --model "${LATTIX_MODEL_INPUT}" \
+          --output "${LATTIX_MODEL_BEFORE}" \
+          --repository "${GITHUB_REPOSITORY}" \
+          --revision "${revision}"
+
+    - name: Run required source security suite
+      id: source_scan
+      continue-on-error: true
+      shell: bash
+      run: |
+        python "${LATTIX_PENTEST_ROOT}/scripts/run_security_suite.py" \
+          --phase shift-left \
+          --source "${LATTIX_SOURCE_ROOT}" \
+          --run-dir "${LATTIX_RUN_DIR}" \
+          --require semgrep trivy-fs trufflehog checkov \
+          --fail-on-error
+        python "${LATTIX_PENTEST_ROOT}/scripts/run_security_suite.py" \
+          --phase sbom \
+          --source "${LATTIX_SOURCE_ROOT}" \
+          --run-dir "${LATTIX_RUN_DIR}" \
+          --require grype syft \
+          --fail-on-error
+
+    - name: Run optional authorized black-box pentest
+      id: active_scan
+      if: ${{ inputs.target-url != '' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        PENTEST_RUN_DIR: ${{ env.LATTIX_RUN_DIR }}
+        PENTEST_TARGET_URL: ${{ inputs.target-url }}
+      run: |
+        bash "${LATTIX_PENTEST_ROOT}/scripts/run_blackbox_scans.sh" \
+          "${PENTEST_TARGET_URL}" ci "github:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}"
+        completed=0
+        for artifact in \
+          nmap.txt \
+          whatweb.json \
+          nuclei.json \
+          zap.json \
+          nikto.txt \
+          katana.txt \
+          nmap_tls_headers.txt; do
+          if [[ -s "${LATTIX_RUN_DIR}/${artifact}" ]]; then
+            completed=$((completed + 1))
+          else
+            echo "::warning::Active scanner did not produce ${artifact}"
+          fi
+        done
+        if [[ "${completed}" -lt 4 ]]; then
+          echo "::error::Active pentest produced only ${completed}/7 expected evidence files"
+          exit 2
+        fi
+
+    - name: Enforce required active pentest input
+      id: active_required
+      if: ${{ inputs.require-active-pentest == 'true' && inputs.target-url == '' }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        echo "::error::require-active-pentest is true but target-url is empty"
+        exit 2
+
+    - name: Run optional API fuzzing
+      id: api_scan
+      if: ${{ inputs.openapi-url != '' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        PENTEST_OPENAPI_URL: ${{ inputs.openapi-url }}
+      run: |
+        python "${LATTIX_PENTEST_ROOT}/scripts/run_security_suite.py" \
+          --phase api \
+          --source "${LATTIX_SOURCE_ROOT}" \
+          --run-dir "${LATTIX_RUN_DIR}" \
+          --require schemathesis \
+          --fail-on-error
+
+    - name: Validate optional Threagile model
+      id: threagile_scan
+      if: ${{ steps.paths.outputs.has-threagile-model == 'true' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        PENTEST_THREAT_MODEL: ${{ env.LATTIX_THREAGILE_MODEL }}
+      run: |
+        python "${LATTIX_PENTEST_ROOT}/scripts/run_security_suite.py" \
+          --phase threatmodel \
+          --source "${LATTIX_SOURCE_ROOT}" \
+          --run-dir "${LATTIX_RUN_DIR}" \
+          --require threagile \
+          --fail-on-error
+
+    - name: Normalize pentest findings
+      id: normalize
+      if: always()
+      continue-on-error: true
+      shell: bash
+      run: |
+        python "${LATTIX_PENTEST_ROOT}/scripts/normalize_findings.py" \
+          "${LATTIX_RUN_DIR}" --out "${LATTIX_FINDINGS}"
+        python "${LATTIX_PENTEST_ROOT}/scripts/to_sarif.py" "${LATTIX_FINDINGS}"
+
+    - name: Update and revalidate threat model
+      id: threat_model_update
+      if: always() && steps.normalize.outcome == 'success'
+      continue-on-error: true
+      shell: bash
+      run: |
+        python "${LATTIX_PENTEST_ROOT}/scripts/threat_model_lifecycle.py" update \
+          --model "${LATTIX_MODEL_BEFORE}" \
+          --findings "${LATTIX_FINDINGS}" \
+          --output "${LATTIX_MODEL_FINAL}" \
+          --run-id "${GITHUB_REPOSITORY}:${GITHUB_SHA}:${GITHUB_RUN_ID}"
+        python "${LATTIX_PENTEST_ROOT}/scripts/threat_model_lifecycle.py" validate \
+          --model "${LATTIX_MODEL_FINAL}"
+
+    - name: Apply severity gate
+      id: severity_gate
+      if: always() && steps.normalize.outcome == 'success'
+      continue-on-error: true
+      shell: bash
+      env:
+        GATE_PROFILE: ${{ inputs.gate-profile }}
+      run: python "${LATTIX_PENTEST_ROOT}/scripts/gate.py" "${LATTIX_FINDINGS}" --profile "${GATE_PROFILE}"
+
+    - name: Upload SARIF
+      if: always() && steps.normalize.outcome == 'success'
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
+      with:
+        sarif_file: ${{ env.LATTIX_RUN_DIR }}/findings.sarif
+        category: lattix-ci-pentest
+
+    - name: Upload findings, SBOM, and threat-model evidence
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: lattix-security-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ env.LATTIX_RUN_DIR }}/findings.normalized.json
+          ${{ env.LATTIX_RUN_DIR }}/findings.sarif
+          ${{ env.LATTIX_RUN_DIR }}/sbom.spdx.json
+          ${{ env.LATTIX_RUN_DIR }}/suite_meta.json
+          ${{ env.LATTIX_RUN_DIR }}/threat-model.before.json
+          ${{ env.LATTIX_RUN_DIR }}/threat-model.json
+          ${{ env.LATTIX_RUN_DIR }}/zap.html
+        retention-days: 90
+        if-no-files-found: error
+
+    - name: Enforce complete security lifecycle
+      if: always()
+      shell: bash
+      env:
+        SOURCE_SCAN: ${{ steps.source_scan.outcome }}
+        ACTIVE_SCAN: ${{ steps.active_scan.outcome }}
+        ACTIVE_REQUIRED: ${{ steps.active_required.outcome }}
+        API_SCAN: ${{ steps.api_scan.outcome }}
+        THREAGILE_SCAN: ${{ steps.threagile_scan.outcome }}
+        NORMALIZE: ${{ steps.normalize.outcome }}
+        THREAT_MODEL_UPDATE: ${{ steps.threat_model_update.outcome }}
+        SEVERITY_GATE: ${{ steps.severity_gate.outcome }}
+      run: |
+        set -euo pipefail
+        failed=0
+        for result in \
+          "source_scan=${SOURCE_SCAN}" \
+          "active_required=${ACTIVE_REQUIRED}" \
+          "normalize=${NORMALIZE}" \
+          "threat_model_update=${THREAT_MODEL_UPDATE}" \
+          "severity_gate=${SEVERITY_GATE}"; do
+          if [[ "${result#*=}" == "failure" ]]; then
+            echo "::error::${result}"
+            failed=1
+          fi
+        done
+        for optional in \
+          "active_scan=${ACTIVE_SCAN}" \
+          "api_scan=${API_SCAN}" \
+          "threagile_scan=${THREAGILE_SCAN}"; do
+          if [[ "${optional#*=}" == "failure" ]]; then
+            echo "::error::${optional}"
+            failed=1
+          fi
+        done
+        exit "${failed}"
