@@ -1,0 +1,3 @@
+source_repository=LATTIX-IO/lattix-cicd-pentest
+source_commit=baa9d8e97a96d4730046381076e5ebdf63553553
+distribution=repository-local-public-consumer

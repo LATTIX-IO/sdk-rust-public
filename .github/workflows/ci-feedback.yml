@@ -1,0 +1,41 @@
+name: CI Feedback to Linear
+
+on:
+  workflow_run:
+    workflows:
+      - "CI"
+      - "Release"
+      - "Security and threat model"
+    types:
+      - completed
+
+concurrency:
+  group: ci-feedback-${{ github.event.repository.full_name }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  feedback:
+    name: Classify and reconcile Linear defect
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["pull_request","push","release","schedule","workflow_dispatch"]'), github.event.workflow_run.event)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted feedback engine
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Process trusted workflow result
+        uses: ./.github/actions/linear-ci-feedback
+        with:
+          github-token: ${{ github.token }}
+          linear-api-key: ${{ secrets.LINEAR_CI_FEEDBACK_API_KEY }}
+          project-slug: "289d946064d4"
+          team-key: "FRONT"

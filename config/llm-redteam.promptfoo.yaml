@@ -1,0 +1,45 @@
+# promptfoo LLM red-team config — STARTER.
+#
+# The suite (llm phase) runs:  promptfoo redteam run -c <this file> -o /out/promptfoo.json
+# normalize_findings.py ingests promptfoo.json as `llm_security` findings.
+#
+# Point `targets` at the model/endpoint your product exposes. Examples:
+#   - id: anthropic:messages:claude-opus-4-8        (uses ANTHROPIC_API_KEY)
+#   - id: openai:chat:gpt-4o                         (uses OPENAI_API_KEY)
+#   - id: https                                      (your own API endpoint)
+# Credentials are passed through from the environment by run_security_suite.py.
+description: Lattix LLM red-team
+
+targets:
+  - id: https
+    label: lattix-app-llm
+    config:
+      # Set PENTEST_LLM_TARGET to your model-backed endpoint.
+      url: "{{env.PENTEST_LLM_TARGET}}"
+      method: POST
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer {{env.PENTEST_LLM_API_KEY}}"
+      body:
+        prompt: "{{prompt}}"
+      transformResponse: "json.response || json.output || json"
+
+redteam:
+  purpose: >
+    A multi-tenant SaaS assistant that answers questions over tenant-scoped data.
+    It must never reveal another tenant's data, leak system prompts/secrets, or
+    follow instructions embedded in retrieved content.
+  numTests: 5
+  plugins:
+    - prompt-injection
+    - jailbreak
+    - pii
+    - harmful
+    - hijacking
+    - rbac
+    - bola            # broken object-level authorization (cross-tenant access)
+    - bfla            # broken function-level authorization
+  strategies:
+    - jailbreak
+    - prompt-injection
+    - base64

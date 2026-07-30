@@ -1,0 +1,66 @@
+name: Lattix trusted Linear CI feedback
+description: Convert a trusted completed GitHub Actions workflow into deduplicated Linear remediation work.
+
+inputs:
+  linear-api-key:
+    description: Dedicated Linear CI feedback credential.
+    required: true
+  github-token:
+    description: GitHub token with actions, contents, and pull-request read access.
+    required: true
+  project-slug:
+    description: Linear project slugId that owns defects for this repository.
+    required: true
+  team-key:
+    description: Linear team key assigned to the project.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: "3.12"
+
+    - name: Resolve trusted repository routing
+      shell: bash
+      env:
+        LINEAR_API_KEY: ${{ inputs.linear-api-key }}
+        LATTIX_PROJECT_SLUG: ${{ inputs.project-slug }}
+        LATTIX_TEAM_KEY: ${{ inputs.team-key }}
+        PYTHONPATH: ${{ github.action_path }}/../../..
+      run: |
+        set -euo pipefail
+        kit_root="$(cd "${GITHUB_ACTION_PATH}/../../.." && pwd)"
+        config_path="${RUNNER_TEMP}/lattix-ci-feedback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+        python -m ci_feedback.bootstrap \
+          --repository "${GITHUB_REPOSITORY}" \
+          --project-slug "${LATTIX_PROJECT_SLUG}" \
+          --team-key "${LATTIX_TEAM_KEY}" \
+          --output "${config_path}"
+        echo "LATTIX_CI_FEEDBACK_ROOT=${kit_root}" >> "${GITHUB_ENV}"
+        echo "LATTIX_CI_FEEDBACK_CONFIG=${config_path}" >> "${GITHUB_ENV}"
+
+    - name: Validate Linear prerequisites
+      shell: bash
+      env:
+        LINEAR_API_KEY: ${{ inputs.linear-api-key }}
+        PYTHONPATH: ${{ env.LATTIX_CI_FEEDBACK_ROOT }}
+      run: >-
+        python -m ci_feedback.cli
+        --config "${LATTIX_CI_FEEDBACK_CONFIG}"
+        validate
+        --live-linear
+
+    - name: Reconcile workflow result with Linear
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        LINEAR_API_KEY: ${{ inputs.linear-api-key }}
+        PYTHONPATH: ${{ env.LATTIX_CI_FEEDBACK_ROOT }}
+      run: >-
+        python -m ci_feedback.cli
+        --config "${LATTIX_CI_FEEDBACK_CONFIG}"
+        process
+        --event "${GITHUB_EVENT_PATH}"

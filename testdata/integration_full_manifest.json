@@ -1,0 +1,123 @@
+{
+  "name": "integration-full",
+  "version": 1,
+  "description": "Canonical end-to-end SDK contract fixture covering metadata-only control-plane, detached signature, envelope, TDF, rewrap, artifact registration, and evidence ingestion.",
+  "tenant_id": "tenant-integration-full",
+  "principal_id": "principal-sdk-contract",
+  "subject": "spiffe://lattix.test/sdk-contract-runner",
+  "default_required_scopes": [
+    "sdk.protect",
+    "sdk.access",
+    "sdk.rewrap"
+  ],
+  "policy_scope": "integration-full-contract",
+  "workload": {
+    "application": "sdk-contract-suite",
+    "environment": "test",
+    "component": "integration-full-runner"
+  },
+  "resource": {
+    "kind": "document",
+    "id": "integration-full-doc",
+    "mime_type": "text/plain"
+  },
+  "purpose": "sdk-contract-validation",
+  "plaintext_utf8": "Integration full scenario plaintext for SDK contract validation.",
+  "content_digest": "sha256:integration-full-plaintext",
+  "labels": [
+    "classification:internal",
+    "program:sdk",
+    "scenario:integration-full"
+  ],
+  "attributes": {
+    "region": "test-us",
+    "data_domain": "sdk-contract",
+    "policy_hash": "sha256:policy-contract"
+  },
+  "inline_key_b64": "ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0A=",
+  "rewrap_key_b64": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A=",
+  "managed_key_provider_name": "integration-full-provider",
+  "managed_key_reference": "kms://integration/full/current",
+  "managed_key_b64": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4A=",
+  "managed_rewrap_key_reference": "kms://integration/full/rewrap",
+  "managed_rewrap_key_b64": "gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A=",
+  "signing_key_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "verifying_key_b64": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+  "steps": [
+    {
+      "name": "capabilities",
+      "description": "Read SDK capability metadata and auth configuration.",
+      "sdk_methods": ["capabilities"]
+    },
+    {
+      "name": "bootstrap",
+      "description": "Fetch bootstrap metadata for local enforcement.",
+      "sdk_methods": ["bootstrap"]
+    },
+    {
+      "name": "whoami",
+      "description": "Resolve effective caller identity.",
+      "sdk_methods": ["whoami"]
+    },
+    {
+      "name": "prepare_local_protection",
+      "description": "Prepare local protection state for envelope artifacts.",
+      "sdk_methods": ["prepare_local_protection"]
+    },
+    {
+      "name": "generate_cid_binding",
+      "description": "Generate the content identifier binding for the plaintext.",
+      "sdk_methods": ["generate_cid_binding"]
+    },
+    {
+      "name": "protection_plan",
+      "description": "Request a protection plan for the TDF artifact path.",
+      "sdk_methods": ["protection_plan"]
+    },
+    {
+      "name": "policy_resolve",
+      "description": "Resolve platform policy for protection operations.",
+      "sdk_methods": ["policy_resolve"]
+    },
+    {
+      "name": "key_access_plan",
+      "description": "Request authorization guidance for managed key transport.",
+      "sdk_methods": ["key_access_plan"]
+    },
+    {
+      "name": "detached_signature_round_trip",
+      "description": "Sign and verify detached-signature artifacts locally.",
+      "sdk_methods": ["sign_bytes_with_detached_signature", "verify_bytes_with_detached_signature"]
+    },
+    {
+      "name": "envelope_round_trip",
+      "description": "Protect and access an envelope artifact using managed keys.",
+      "sdk_methods": ["protect_bytes_with_envelope", "access_bytes_with_envelope"]
+    },
+    {
+      "name": "envelope_rewrap",
+      "description": "Rewrap the envelope artifact from the current to the rewrap key.",
+      "sdk_methods": ["rewrap_bytes_with_envelope"]
+    },
+    {
+      "name": "tdf_round_trip",
+      "description": "Protect and access a TDF artifact using managed keys.",
+      "sdk_methods": ["protect_bytes_with_tdf", "access_bytes_with_tdf"]
+    },
+    {
+      "name": "tdf_rewrap",
+      "description": "Rewrap the TDF artifact to a new managed key reference.",
+      "sdk_methods": ["rewrap_bytes_with_tdf"]
+    },
+    {
+      "name": "artifact_register_direct",
+      "description": "Register the rewrapped artifact through the direct SDK call.",
+      "sdk_methods": ["artifact_register"]
+    },
+    {
+      "name": "evidence_direct",
+      "description": "Submit rewrap evidence through the direct SDK call.",
+      "sdk_methods": ["evidence"]
+    }
+  ]
+}

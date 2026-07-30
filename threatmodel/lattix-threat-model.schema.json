@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lattix.io/schemas/security/threat-model-v1.json",
+  "title": "Lattix machine-readable threat model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "metadata",
+    "scope",
+    "assets",
+    "trust_boundaries",
+    "data_flows",
+    "threats",
+    "scan_evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "lattix.threat-model/v1"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "source_revision", "generated", "generated_at", "updated_at"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
+        "generated": {"type": "boolean"},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "source_root", "signals"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1},
+        "source_root": {"type": "string", "minLength": 1},
+        "signals": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/asset"}
+    },
+    "trust_boundaries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/boundary"}
+    },
+    "data_flows": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/flow"}
+    },
+    "threats": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/threat"}
+    },
+    "scan_evidence": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence"}
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "description", "criticality"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "name": {"type": "string", "minLength": 1},
+        "type": {"enum": ["source", "service", "api", "container", "deployment", "data", "identity", "artifact"]},
+        "description": {"type": "string", "minLength": 1},
+        "criticality": {"enum": ["low", "medium", "high", "critical"]}
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "assets"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "assets": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "destination", "description", "protection"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "source": {"type": "string", "minLength": 1},
+        "destination": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "protection": {"type": "string", "minLength": 1}
+      }
+    },
+    "threat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "category", "stride", "severity", "status", "source", "evidence_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "title": {"type": "string", "minLength": 1},
+        "category": {"type": "string", "minLength": 1},
+        "stride": {"enum": ["spoofing", "tampering", "repudiation", "information-disclosure", "denial-of-service", "elevation-of-privilege", "supply-chain"]},
+        "severity": {"enum": ["critical", "high", "medium", "low", "info", "unknown"]},
+        "status": {"enum": ["modeled", "observed", "mitigated", "accepted", "false-positive"]},
+        "source": {"type": "string", "minLength": 1},
+        "evidence_refs": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "generated_at", "findings_file", "summary"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "findings_file": {"type": "string", "minLength": 1},
+        "summary": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

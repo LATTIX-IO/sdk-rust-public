@@ -72,6 +72,7 @@ fn manifest_path() -> PathBuf {
 
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let candidates = [
+        base.join("testdata").join("integration_full_manifest.json"),
         base.join("..")
             .join("prop-system-tests")
             .join("fixtures")
