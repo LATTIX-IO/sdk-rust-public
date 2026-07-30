@@ -17,6 +17,7 @@ GENERATED_LABELS = [
     "auto-remediation",
     "agent:eligible",
 ]
+REPOSITORY_LABEL_GROUP = "repository"
 
 
 class BootstrapError(RuntimeError):
@@ -35,7 +36,11 @@ def resolve_config(
     endpoint: str = LINEAR_ENDPOINT,
     transport: Transport | None = None,
 ) -> dict[str, Any]:
-    if not repository or "/" not in repository:
+    if (
+        not repository
+        or repository.count("/") != 1
+        or any(not part.strip() for part in repository.split("/", 1))
+    ):
         raise BootstrapError("repository must be an owner/name pair.")
     if not project_slug.strip():
         raise BootstrapError("project_slug is required.")
@@ -119,6 +124,7 @@ def resolve_config(
         )
 
     project_id = _required_string(project, "id", "Linear project")
+    repository_name = repository.rsplit("/", 1)[1].strip().casefold()
     return {
         "version": 1,
         "repository_allowlist": [repository],
@@ -137,7 +143,10 @@ def resolve_config(
                 # Fail closed into In Review with human-review labels at the limit.
                 "escalated": states["In Review"],
             },
-            "generated_labels": GENERATED_LABELS,
+            "generated_labels": [
+                *GENERATED_LABELS,
+                f"{REPOSITORY_LABEL_GROUP}:{repository_name}",
+            ],
         },
         "policy": {
             "actionable_conclusions": [
