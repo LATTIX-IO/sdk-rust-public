@@ -4,6 +4,9 @@ tracker:
   endpoint: https://api.linear.app/graphql
   api_key: $LINEAR_API_KEY
   project_slug: "289d946064d4"
+  required_labels:
+    - eligible
+    - sdk-rust-public
   active_states:
     - Todo
     - In Progress
