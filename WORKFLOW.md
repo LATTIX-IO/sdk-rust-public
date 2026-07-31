@@ -1,15 +1,17 @@
 ---
 tracker:
   kind: linear
-  endpoint: https://api.linear.app/graphql
-  api_key: $LINEAR_API_KEY
-  project_slug: "289d946064d4"
+  provider:
+    endpoint: https://api.linear.app/graphql
+    api_key: $LINEAR_API_KEY
+    project_slug: "289d946064d4"
   required_labels:
     - eligible
     - sdk-rust-public
   active_states:
     - Todo
     - In Progress
+    - Rework
   exclude_labels:
     - epic
   terminal_states:
@@ -21,7 +23,7 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/lattix/.symphony/workspaces/sdk-rust"
+  root: "E:/lattix/.symphony/workspaces/sdk-rust"
 hooks:
   timeout_ms: 120000
   after_create: |
@@ -44,9 +46,9 @@ agent:
     todo: 1
     in progress: 2
 codex:
-  command: codex app-server -c model="gpt-5.5" -c model_reasoning_effort="low"
+  command: bash "$SYMPHONY_CODEX_WRAPPER"
   turn_timeout_ms: 3600000
-  read_timeout_ms: 5000
+  read_timeout_ms: 30000
   stall_timeout_ms: 300000
   approval_policy: never
 symphony:
@@ -105,6 +107,12 @@ Use the issue description, labels, blockers, linked assets, and repository conte
 - Do not expand the issue to include opportunistic cleanup. Create or recommend a separate follow-up issue for meaningful out-of-scope improvements, especially security, reliability, or tech-debt findings.
 - For production, security, IaC, GitOps, data, or migration changes, include rollback notes and any threat assumptions in the final handoff.
 
+## Unattended GitHub contract
+
+Use the local git command and authenticated gh CLI for branch, pull-request, review, and check
+operations. Do not use GitHub MCP or app connectors in unattended Symphony runs because connector
+approval elicitations cannot be completed by the worker. If gh auth status --hostname github.com
+fails, record the blocker and stop without trying another external tool.
 ## Required execution flow
 
 1. Re-read the issue and inspect the current repository state before editing.
