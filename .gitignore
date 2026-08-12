@@ -12,3 +12,4 @@ AGENTS.local.md
 __pycache__/
 *.py[cod]
 reports/
+.env.symphony.local
